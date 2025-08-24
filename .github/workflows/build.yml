@@ -13,8 +13,8 @@ jobs:
     strategy:
       matrix:
         variant:
-          # - base
-          # - opa
+          - base
+          - opa
           - julia
     runs-on: ubuntu-latest
     permissions:
