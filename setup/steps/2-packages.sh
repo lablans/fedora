@@ -22,9 +22,9 @@ pkgs+=(
 )
 
 # Desktop Enhancements / Tools
-pkgs+=(
-  kbackup
-)
+# pkgs+=(
+#   kbackup
+# )
 
 # Intel GPU
 if [ "${VARIANT}" == "julia" ]; then
