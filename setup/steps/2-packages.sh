@@ -21,9 +21,17 @@ pkgs+=(
   seadrive-gui
 )
 
+# Intel GPU
 if [ "${VARIANT}" == "julia" ]; then
   pkgs+=(
     intel-media-driver
+  )
+fi
+
+# AMD GPU
+if [ "${VARIANT}" == "opa" ]; then
+  pkgs+=(
+    mesa-va-drivers-freeworld
   )
 fi
 
