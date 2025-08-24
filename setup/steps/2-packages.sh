@@ -21,6 +21,11 @@ pkgs+=(
   seadrive-gui
 )
 
+# Desktop Enhancements / Tools
+pkgs+=(
+  kbackup
+)
+
 # Intel GPU
 if [ "${VARIANT}" == "julia" ]; then
   pkgs+=(
