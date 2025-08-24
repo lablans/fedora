@@ -1,0 +1,20 @@
+{
+  "default": [
+    {
+      "type": "insecureAcceptAnything"
+    }
+  ],
+  "transports": {
+    "docker": {
+      "ghcr.io/lablans": [
+        {
+          "type": "sigstoreSigned",
+          "keyPath": "/usr/lib/martin/cosign.pub",
+          "signedIdentity": {
+            "type": "matchRepository"
+          }
+        }
+      ]
+    }
+  }
+}
