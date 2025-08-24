@@ -2,15 +2,7 @@ name: build
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-#    paths:
-#      - Containerfile
   pull_request:
-    branches:
-      - main
-#    paths:
-#      - Containerfile
 
 env:
   REGISTRY: ghcr.io
@@ -18,6 +10,12 @@ env:
 
 jobs:
   build-and-push:
+    strategy:
+      matrix:
+        variant:
+          # - base
+          # - opa
+          - julia
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,9 +29,11 @@ jobs:
         uses: redhat-actions/buildah-build@v2
         with:
           image: ${{ env.IMAGE_NAME }}
-          tags: stable 42 ${{ github.sha }}
+          tags: ${{ matrix.variant }}-stable ${{ matrix.variant }}-42 ${{ github.sha }}
           containerfiles: |
             ./Containerfile
+          build-args: |
+            VARIANT=${{ matrix.variant }}
 
       - name: Log in to the GitHub Container registry
         uses: redhat-actions/podman-login@v1
