@@ -15,9 +15,10 @@ jobs:
     strategy:
       matrix:
         variant:
-          - base
+          # - base
           - opa
-          - julia
+          # - julia
+      fail-fast: false
     runs-on: ubuntu-latest
     permissions:
       contents: read
