@@ -16,6 +16,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -30,56 +33,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build image (opa)
-        id: build-image-opa
-        uses: redhat-actions/buildah-build@v2
+      - name: Build/Push/Sign (opa)
+        uses: ./.github/actions/build-push-sign
         with:
-          image: ${{ env.IMAGE_NAME }}
-          tags: opa-stable opa-42 ${{ github.sha }}
-          containerfiles: |
-            ./Containerfile
-          extra-args: |
-            --target opa
+          image_name: ${{ env.IMAGE_NAME }}
+          registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
+          tags: "opa-stable opa-42"
+          target: "opa"
 
-      - name: Push to GitHub Container Repository (opa)
-        id: push-to-ghcr-opa
-        uses: redhat-actions/push-to-registry@v2
+      - name: Build/Push/Sign (julia)
+        uses: ./.github/actions/build-push-sign
         with:
-          image: ${{ steps.build-image-opa.outputs.image }}
-          tags: ${{ steps.build-image-opa.outputs.tags }}
-          registry: ${{ env.REGISTRY }}/${{ github.actor }}
-
-      - name: Sign container image (opa)
-        run: |
-          cosign sign -y --key env://COSIGN_PRIVATE_KEY ${{ env.REGISTRY }}/${{ github.actor }}/${{ env.IMAGE_NAME }}@${TAGS}
-        env:
-          TAGS: ${{ steps.push-to-ghcr-opa.outputs.digest }}
-          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-
-      - name: Build image (julia)
-        id: build-image-julia
-        uses: redhat-actions/buildah-build@v2
-        with:
-          image: ${{ env.IMAGE_NAME }}
-          tags: julia-stable julia-42 ${{ github.sha }}
-          containerfiles: |
-            ./Containerfile
-          extra-args: |
-            --target julia
-
-      - name: Push to GitHub Container Repository (julia)
-        id: push-to-ghcr-julia
-        uses: redhat-actions/push-to-registry@v2
-        with:
-          image: ${{ steps.build-image-julia.outputs.image }}
-          tags: ${{ steps.build-image-julia.outputs.tags }}
-          registry: ${{ env.REGISTRY }}/${{ github.actor }}
-
-      - name: Sign container image (julia)
-        run: |
-          cosign sign -y --key env://COSIGN_PRIVATE_KEY ${{ env.REGISTRY }}/${{ github.actor }}/${{ env.IMAGE_NAME }}@${TAGS}
-        env:
-          TAGS: ${{ steps.push-to-ghcr-julia.outputs.digest }}
-          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          image_name: ${{ env.IMAGE_NAME }}
+          registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
+          tags: "julia-stable julia-42"
+          target: "julia"

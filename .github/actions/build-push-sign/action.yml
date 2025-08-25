@@ -1,0 +1,48 @@
+name: Build, push, and sign container target
+description: Reusable step that builds a target, pushes it, and signs the resulting digest.
+inputs:
+  image_name:
+    description: Container image name (repository)
+    required: true
+  registry_path:
+    description: Full registry path (e.g. ghcr.io/OWNER)
+    required: true
+  tags:
+    description: Space-separated tags (without SHA)
+    required: true
+  target:
+    description: Build target
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Build image (${{ inputs.target }})
+    # buildah-build supports caching within same runner between steps
+      id: build_image
+      uses: redhat-actions/buildah-build@v2
+      with:
+        image: ${{ inputs.image_name }}
+        containerfiles: |
+          ./Containerfile
+        tags: ${{ inputs.tags }} ${{ github.sha }}
+        extra-args: |
+          --target ${{ inputs.target }}
+        # layers: true  # uncomment if you want layer caching behavior enabled explicitly
+
+    - name: Push to registry (${{ inputs.target }})
+      id: push_image
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: ${{ steps.build_image.outputs.image }}
+        tags: ${{ steps.build_image.outputs.tags }}
+        registry: ${{ inputs.registry_path }}
+
+    - name: Sign image (${{ inputs.target }})
+      shell: bash
+      env:
+        DIGEST: ${{ steps.push_image.outputs.digest }}
+        COSIGN_PRIVATE_KEY: ${{ env.COSIGN_PRIVATE_KEY }}
+        COSIGN_PASSWORD: ${{ env.COSIGN_PASSWORD }}
+      run: |
+        cosign sign -y --key env://COSIGN_PRIVATE_KEY \
+          ${{ inputs.registry_path }}/${{ inputs.image_name }}@${DIGEST}
