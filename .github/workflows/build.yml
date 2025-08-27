@@ -12,31 +12,19 @@ env:
 
 jobs:
   build-and-push:
-    strategy:
-      matrix:
-        variant:
-          - base
-          - opa
-          - julia
-      fail-fast: false
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    env:
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Build image
-        id: build-image
-        uses: redhat-actions/buildah-build@v2
-        with:
-          image: ${{ env.IMAGE_NAME }}
-          tags: ${{ matrix.variant }}-stable ${{ matrix.variant }}-42 ${{ github.sha }}
-          containerfiles: |
-            ./Containerfile
-          build-args: |
-            VARIANT=${{ matrix.variant }}
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
 
       - name: Log in to the GitHub Container registry
         uses: redhat-actions/podman-login@v1
@@ -45,21 +33,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push to GitHub Container Repository
-        id: push-to-ghcr
-        uses: redhat-actions/push-to-registry@v2
+      - name: Build/Push/Sign (opa)
+        uses: ./.github/actions/build-push-sign
         with:
-          image: ${{ steps.build-image.outputs.image }}
-          tags: ${{ steps.build-image.outputs.tags }}
-          registry: ${{ env.REGISTRY }}/${{ github.actor }}
+          image_name: ${{ env.IMAGE_NAME }}
+          registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
+          tags: "opa-stable opa-42"
+          target: "opa"
 
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3
-
-      - name: Sign container image
-        run: |
-          cosign sign -y --key env://COSIGN_PRIVATE_KEY ${{ env.REGISTRY }}/${{ github.actor }}/${{ env.IMAGE_NAME }}@${TAGS}
-        env:
-          TAGS: ${{ steps.push-to-ghcr.outputs.digest }}
-          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+      - name: Build/Push/Sign (julia)
+        uses: ./.github/actions/build-push-sign
+        with:
+          image_name: ${{ env.IMAGE_NAME }}
+          registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
+          tags: "julia-stable julia-42"
+          target: "julia"
