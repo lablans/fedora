@@ -29,12 +29,35 @@ runs:
           --target ${{ inputs.target }}
         # layers: true  # uncomment if you want layer caching behavior enabled explicitly
 
+    - name: Determine Upstream Image Version
+      shell: bash
+      run: |
+        version=$(podman image inspect $IMAGE \
+          --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')
+        echo "IMAGE_VERSION=$version" >> $GITHUB_ENV
+      env:
+        IMAGE: ${{ steps.build_image.outputs.image-with-tag }}
+
+    - name: Tag local image
+      shell: bash
+      run: |
+        set -x
+        LONG_TAG="${{ inputs.target }}-${IMAGE_VERSION}"
+        MAJOR_TAG=$(echo ${LONG_TAG} | sed 's:\..*::')
+        podman tag ${IMAGE} ${{ inputs.image_name }}:${LONG_TAG} ${{ inputs.image_name }}:${MAJOR_TAG}
+        podman images
+      env:
+        IMAGE: ${{ steps.build_image.outputs.image-with-tag }}
+        IMAGE_VERSION: ${{ env.IMAGE_VERSION }}
+
     - name: Push to registry (${{ inputs.target }})
       id: push_image
       uses: redhat-actions/push-to-registry@v2
       with:
         image: ${{ steps.build_image.outputs.image }}
-        tags: ${{ steps.build_image.outputs.tags }}
+        tags: |
+          ${{ steps.build_image.outputs.tags }}
+          ${{ inputs.target }}-${{ env.IMAGE_VERSION }}
         registry: ${{ inputs.registry_path }}
 
     - name: Sign image (${{ inputs.target }})
