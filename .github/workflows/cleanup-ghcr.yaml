@@ -1,0 +1,22 @@
+name: Cleanup ghcr.io
+on:
+  workflow_dispatch:
+  push:
+  schedule:
+    - cron: '0 5 * * 0'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: kinoite
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          packages: kinoite
+          delete-untagged: true
+          keep-n-tagged: 14
