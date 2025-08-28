@@ -20,6 +20,11 @@ jobs:
       COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
       COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
     steps:
+      - name: Record start time
+        id: start
+        run: |
+          echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -48,3 +53,11 @@ jobs:
           registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
           tags: "julia-stable"
           target: "julia"
+
+      - name: Report to monitoring
+        shell: bash
+        env:
+          URL: ${{ secrets.MONITORING_PUSH_URL }}
+        run: |
+          ELAPSED=$(( 1000 * ( $(date +%s) - ${{ steps.start.outputs.time }} ) ))
+          curl "${URL}?status=up&msg=Successfully%20built%20and%20pushed%20images&ping=${ELAPSED}"
