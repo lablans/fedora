@@ -1,8 +1,10 @@
 [Unit]
 Description=Report new rpm-ostree deployments
 
-[Path]
-PathExists=/run/ostree/staged-deployment
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
 
 [Install]
 WantedBy=multi-user.target

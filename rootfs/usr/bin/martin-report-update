@@ -1,13 +1,40 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 set -euo pipefail
 
-until rpm-ostree status | grep -qm1 "^State: idle"; do
-    echo "Waiting for rpm-ostree to be idle"
-    sleep 5
-done
+: "${PUSH_URL:?Missing PUSH_URL}"
+STALE_DAYS="${STALE_DAYS:-7}"
 
-STAGED=$(bootc status --format json | jq -r .status.staged.image.version)
-NUMERIC=$(echo $STAGED | cut -d '.' -f 2)
+STATE_DIR=/var/lib/martin/monitoring
+mkdir -p "$STATE_DIR"
+VER_FILE="${STATE_DIR}/version"
+CHG_FILE="${STATE_DIR}/last_change_date"
 
-exec curl "${MONITORING_URL}?status=up&msg=Staged%20${STAGED}&ping=${NUMERIC}"
+# Read current Silverblue version
+ver=$(rpm-ostree status --json | jq -r '.deployments[0].version')
+
+today=$(date -I)
+prev_ver=""; [[ -f "$VER_FILE" ]] && prev_ver=$(cat "$VER_FILE")
+
+if [[ "$ver" != "$prev_ver" && "$ver" != "unknown" ]]; then
+  printf '%s' "$ver" >"$VER_FILE"
+  printf '%s' "$today" >"$CHG_FILE"
+fi
+
+last_change="$today"
+[[ -f "$CHG_FILE" ]] && last_change=$(cat "$CHG_FILE")
+
+# Days since last change
+days_since=$(( ( $(date -d "$today" +%s) - $(date -d "$last_change" +%s) ) / 86400 ))
+
+msg_up="Version ${ver} (changed ${last_change}, ${days_since}d ago)"
+msg_down="Version stuck at ${ver} since ${last_change} (${days_since}d)"
+
+if (( days_since >= STALE_DAYS )); then
+  status="down"; msg="$msg_down"
+else
+  status="up"; msg="$msg_up"
+fi
+
+curl -fsS --retry 3 --max-time 10 \
+  "${MONITORING_URL}?status=${status}&msg=$(printf '%s' "$msg" | jq -sRr @uri)" \
+  >/dev/null
