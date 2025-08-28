@@ -4,37 +4,23 @@ set -euo pipefail
 : "${PUSH_URL:?Missing PUSH_URL}"
 STALE_DAYS="${STALE_DAYS:-7}"
 
-STATE_DIR=/var/lib/martin/monitoring
-mkdir -p "$STATE_DIR"
-VER_FILE="${STATE_DIR}/version"
-CHG_FILE="${STATE_DIR}/last_change_date"
-
 # Read current Silverblue version
 ver=$(rpm-ostree status --json | jq -r '.deployments[0].version')
 
-today=$(date -I)
-prev_ver=""; [[ -f "$VER_FILE" ]] && prev_ver=$(cat "$VER_FILE")
+build_date=$(echo "$ver" | cut -d. -f2 | cut -c1-8)
+today=$(date +%Y%m%d)
 
-if [[ "$ver" != "$prev_ver" && "$ver" != "unknown" ]]; then
-  printf '%s' "$ver" >"$VER_FILE"
-  printf '%s' "$today" >"$CHG_FILE"
-fi
+# days since build
+days=$(( ( $(date -d "$today" +%s) - $(date -d "$build_date" +%s) ) / 86400 ))
 
-last_change="$today"
-[[ -f "$CHG_FILE" ]] && last_change=$(cat "$CHG_FILE")
-
-# Days since last change
-days_since=$(( ( $(date -d "$today" +%s) - $(date -d "$last_change" +%s) ) / 86400 ))
-
-msg_up="Version ${ver} (changed ${last_change}, ${days_since}d ago)"
-msg_down="Version stuck at ${ver} since ${last_change} (${days_since}d)"
-
-if (( days_since >= STALE_DAYS )); then
-  status="down"; msg="$msg_down"
+if (( days >= STALE_DAYS )); then
+  status="down"
+  msg="Stuck on $ver (built $build_date, ${days}d old)"
 else
-  status="up"; msg="$msg_up"
+  status="up"
+  msg="Running $ver (built $build_date, ${days}d old)"
 fi
 
 curl -fsS --retry 3 --max-time 10 \
-  "${MONITORING_URL}?status=${status}&msg=$(printf '%s' "$msg" | jq -sRr @uri)" \
+  "${MONITORING_URL}?status=${status}&ping=${days}&msg=$(printf '%s' "$msg" | jq -sRr @uri)" \
   >/dev/null
