@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${PUSH_URL:?Missing PUSH_URL}"
+: "${MONITORING_URL:?Missing MONITORING_URL}"
 STALE_DAYS="${STALE_DAYS:-7}"
 
 # Read current Silverblue version

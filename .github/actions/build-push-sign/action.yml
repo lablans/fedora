@@ -23,10 +23,9 @@ runs:
         image: ${{ inputs.image_name }}
         containerfiles: |
           ./Containerfile
-        tags: ${{ inputs.tags }} ${{ github.sha }}
+        tags: ${{ inputs.tags }} ${{ inputs.target }}-${{ github.sha }}
         extra-args: |
           --target ${{ inputs.target }}
-        layers: true  # uncomment if you want layer caching behavior enabled explicitly
 
     - name: Add extra Tags
       shell: bash
