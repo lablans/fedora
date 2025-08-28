@@ -17,7 +17,6 @@ runs:
   using: "composite"
   steps:
     - name: Build image (${{ inputs.target }})
-    # buildah-build supports caching within same runner between steps
       id: build_image
       uses: redhat-actions/buildah-build@v2
       with:
@@ -27,14 +26,32 @@ runs:
         tags: ${{ inputs.tags }} ${{ github.sha }}
         extra-args: |
           --target ${{ inputs.target }}
-        # layers: true  # uncomment if you want layer caching behavior enabled explicitly
+        layers: true  # uncomment if you want layer caching behavior enabled explicitly
+
+    - name: Add extra Tags
+      shell: bash
+      run: |
+        set -x
+        version=$(podman image inspect ${{ steps.build_image.outputs.image-with-tag }} \
+          --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')
+        LONG_TAG="${{ inputs.target }}-${version}"
+        SHORT_TAG=$(echo ${LONG_TAG} | sed 's:\..*::')
+        echo "LONG_TAG=$LONG_TAG" >> $GITHUB_ENV
+        echo "SHORT_TAG=$SHORT_TAG" >> $GITHUB_ENV
+
+        podman tag ${{ steps.build_image.outputs.image-with-tag }} \
+          ${{ inputs.image_name }}:${LONG_TAG} \
+          ${{ inputs.image_name }}:${SHORT_TAG}
 
     - name: Push to registry (${{ inputs.target }})
       id: push_image
       uses: redhat-actions/push-to-registry@v2
       with:
         image: ${{ steps.build_image.outputs.image }}
-        tags: ${{ steps.build_image.outputs.tags }}
+        tags: |
+          ${{ steps.build_image.outputs.tags }}
+          ${{ env.LONG_TAG }}
+          ${{ env.SHORT_TAG }}
         registry: ${{ inputs.registry_path }}
 
     - name: Sign image (${{ inputs.target }})
