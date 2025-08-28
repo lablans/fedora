@@ -1,7 +1,6 @@
 name: Cleanup ghcr.io
 on:
   workflow_dispatch:
-  push:
   schedule:
     - cron: '0 5 * * 0'
 
