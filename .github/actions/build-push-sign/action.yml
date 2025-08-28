@@ -17,7 +17,6 @@ runs:
   using: "composite"
   steps:
     - name: Build image (${{ inputs.target }})
-    # buildah-build supports caching within same runner between steps
       id: build_image
       uses: redhat-actions/buildah-build@v2
       with:
@@ -27,28 +26,24 @@ runs:
         tags: ${{ inputs.tags }} ${{ github.sha }}
         extra-args: |
           --target ${{ inputs.target }}
-        # layers: true  # uncomment if you want layer caching behavior enabled explicitly
+        layers: true  # uncomment if you want layer caching behavior enabled explicitly
 
-    - name: Determine Upstream Image Version
-      shell: bash
-      run: |
-        version=$(podman image inspect $IMAGE \
-          --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')
-        echo "IMAGE_VERSION=$version" >> $GITHUB_ENV
-      env:
-        IMAGE: ${{ steps.build_image.outputs.image-with-tag }}
-
-    - name: Tag local image
+    - name: Add extra Tags
       shell: bash
       run: |
         set -x
-        LONG_TAG="${{ inputs.target }}-${IMAGE_VERSION}"
-        MAJOR_TAG=$(echo ${LONG_TAG} | sed 's:\..*::')
-        podman tag ${IMAGE} ${{ inputs.image_name }}:${LONG_TAG} ${{ inputs.image_name }}:${MAJOR_TAG}
+        version=$(podman image inspect ${{ steps.build_image.outputs.image-with-tag }} \
+          --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')
+        LONG_TAG="${{ inputs.target }}-${version}"
+        SHORT_TAG=$(echo ${LONG_TAG} | sed 's:\..*::')
+        echo "LONG_TAG=$LONG_TAG" >> $GITHUB_ENV
+        echo "SHORT_TAG=$SHORT_TAG" >> $GITHUB_ENV
+
+        podman tag ${{ steps.build_image.outputs.image-with-tag }} \
+          ${{ inputs.image_name }}:${LONG_TAG} \
+          ${{ inputs.image_name }}:${SHORT_TAG}
+
         podman images
-      env:
-        IMAGE: ${{ steps.build_image.outputs.image-with-tag }}
-        IMAGE_VERSION: ${{ env.IMAGE_VERSION }}
 
     - name: Push to registry (${{ inputs.target }})
       id: push_image
@@ -57,7 +52,8 @@ runs:
         image: ${{ steps.build_image.outputs.image }}
         tags: |
           ${{ steps.build_image.outputs.tags }}
-          ${{ inputs.target }}-${{ env.IMAGE_VERSION }}
+          ${{ env.LONG_TAG }}
+          ${{ env.SHORT_TAG }}
         registry: ${{ inputs.registry_path }}
 
     - name: Sign image (${{ inputs.target }})
