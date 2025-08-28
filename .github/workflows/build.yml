@@ -2,7 +2,7 @@ name: build
 on:
   workflow_dispatch:
   push:
-  pull_request:
+#  pull_request:
   schedule:
     - cron: '0 3 * * *'
 
@@ -43,7 +43,7 @@ jobs:
         with:
           image_name: ${{ env.IMAGE_NAME }}
           registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
-          tags: "opa-stable"
+          tags: "opa-${{ github.ref_name }}"
           target: "opa"
 
       - name: Build/Push/Sign (julia)
@@ -51,7 +51,7 @@ jobs:
         with:
           image_name: ${{ env.IMAGE_NAME }}
           registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
-          tags: "julia-stable"
+          tags: "julia-${{ github.ref_name }}"
           target: "julia"
 
       - name: Report to monitoring

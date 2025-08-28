@@ -1,0 +1,10 @@
+[Unit]
+Description=Report new rpm-ostree deployments
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=multi-user.target

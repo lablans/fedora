@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${PUSH_URL:?Missing PUSH_URL}"
+STALE_DAYS="${STALE_DAYS:-7}"
+
+# Read current Silverblue version
+ver=$(rpm-ostree status --json | jq -r '.deployments[0].version')
+
+build_date=$(echo "$ver" | cut -d. -f2 | cut -c1-8)
+today=$(date +%Y%m%d)
+
+# days since build
+days=$(( ( $(date -d "$today" +%s) - $(date -d "$build_date" +%s) ) / 86400 ))
+
+if (( days >= STALE_DAYS )); then
+  status="down"
+  msg="Stuck on $ver (built $build_date, ${days}d old)"
+else
+  status="up"
+  msg="Running $ver (built $build_date, ${days}d old)"
+fi
+
+curl -fsS --retry 3 --max-time 10 \
+  "${MONITORING_URL}?status=${status}&ping=${days}&msg=$(printf '%s' "$msg" | jq -sRr @uri)" \
+  >/dev/null
