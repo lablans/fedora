@@ -1,0 +1,7 @@
+[Unit]
+Description=Report new rpm-ostree deployments
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/martin/monitoring.conf
+ExecStart=/usr/bin/martin-report-update
