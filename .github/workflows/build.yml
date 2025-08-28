@@ -38,7 +38,7 @@ jobs:
         with:
           image_name: ${{ env.IMAGE_NAME }}
           registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
-          tags: "opa-stable opa-42"
+          tags: "opa-stable"
           target: "opa"
 
       - name: Build/Push/Sign (julia)
@@ -46,5 +46,5 @@ jobs:
         with:
           image_name: ${{ env.IMAGE_NAME }}
           registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
-          tags: "julia-stable julia-42"
+          tags: "julia-stable"
           target: "julia"

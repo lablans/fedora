@@ -43,8 +43,6 @@ runs:
           ${{ inputs.image_name }}:${LONG_TAG} \
           ${{ inputs.image_name }}:${SHORT_TAG}
 
-        podman images
-
     - name: Push to registry (${{ inputs.target }})
       id: push_image
       uses: redhat-actions/push-to-registry@v2
