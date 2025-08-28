@@ -7,7 +7,7 @@ until rpm-ostree status | grep -qm1 "^State: idle"; do
     sleep 5
 done
 
-STAGED=$(bootc status --format json | jr -r .status.staged.image.version)
+STAGED=$(bootc status --format json | jq -r .status.staged.image.version)
 NUMERIC=$(echo $STAGED | cut -d '.' -f 2)
 
 exec curl "${MONITORING_URL}?status=up&msg=Staged%20${STAGED}&ping=${NUMERIC}"
