@@ -33,19 +33,19 @@ jobs:
         uses: actions/cache@v4
         with:
           # Any small file/dir; we just need a path to bind the cache to.
-          path: .digest-cache
+          path: ${{ runner.temp }}/.digest-cache
           key: upstream-digest-${{ steps.upstream_digest.outputs.digest }}
 
       - name: "Precheck: Skip build on old digest"
-        if: github.event_name == 'schedule' && steps.cache.outputs.cache-hit == 'true'
+        if: steps.cache.outputs.cache-hit == 'true'
         run: |
           echo "No new upstream image (digest ${{ steps.upstream_digest.outputs.digest }}). Exiting."
           exit 0
 
       - name: "Precheck: Mark digest as seen"
         run: |
-          mkdir -p .digest-cache
-          echo "${{ steps.upstream_digest.outputs.digest }}" > .digest-cache/last.txt
+          mkdir -p "$RUNNER_TEMP/.digest-cache"
+          echo "${{ steps.upstream_digest.outputs.digest }}" > "$RUNNER_TEMP/.digest-cache/last.txt"
 
       - name: Report to monitoring (start)
         shell: bash
