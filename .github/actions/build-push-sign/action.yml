@@ -13,6 +13,9 @@ inputs:
   target:
     description: Build target
     required: true
+  upstream_image:
+    description: Upstream image to use as a build-arg
+    required: true
 runs:
   using: "composite"
   steps:
@@ -24,6 +27,8 @@ runs:
         containerfiles: |
           ./Containerfile
         tags: ${{ inputs.tags }} ${{ inputs.target }}-${{ github.sha }}
+        build-args: |
+          UPSTREAM_IMAGE=${{ inputs.upstream_image }}
         extra-args: |
           --target ${{ inputs.target }}
 

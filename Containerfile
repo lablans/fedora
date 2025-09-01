@@ -1,10 +1,9 @@
-ARG FEDORA_MAJOR_VERSION=42
-
+ARG UPSTREAM_IMAGE
 FROM scratch AS setup
 
 COPY /setup /
 
-FROM quay.io/fedora-ostree-desktops/kinoite:${FEDORA_MAJOR_VERSION} AS base
+FROM ${UPSTREAM_IMAGE} AS base
 ENV VARIANT=base
 
 COPY rootfs/ /

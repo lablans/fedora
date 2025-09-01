@@ -2,9 +2,8 @@ name: build
 on:
   workflow_dispatch:
   push:
-#  pull_request:
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '0 * * * *'
 
 env:
   REGISTRY: ghcr.io
@@ -19,7 +18,35 @@ jobs:
     env:
       COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
       COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+      UPSTREAM_IMAGE: quay.io/fedora-ostree-desktops/kinoite:42
     steps:
+      - name: "Precheck: Check upstream digest"
+        id: upstream_digest
+        shell: bash
+        run: |
+          DIGEST=$(skopeo inspect --format '{{.Digest}}' docker://${UPSTREAM_IMAGE})
+          echo "Newest digest for upstream image ${UPSTREAM_IMAGE}: ${DIGEST}"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: "Precheck: Probe if digest was built already"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          # Any small file/dir; we just need a path to bind the cache to.
+          path: .digest-cache
+          key: upstream-digest-${{ steps.upstream_digest.outputs.digest }}
+
+      - name: "Precheck: Skip build on old digest"
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: |
+          echo "No new upstream image (digest ${{ steps.upstream_digest.outputs.digest }}). Exiting."
+          exit 0
+
+      - name: "Precheck: Mark digest as seen"
+        run: |
+          mkdir -p .digest-cache
+          echo "${{ steps.upstream_digest.outputs.digest }}" > .digest-cache/last.txt
+
       - name: Report to monitoring (start)
         shell: bash
         env:
@@ -47,6 +74,7 @@ jobs:
           registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
           tags: "opa-${{ github.ref_name }}"
           target: "opa"
+          upstream_image: ${{ env.UPSTREAM_IMAGE }}
 
       - name: Build/Push/Sign (julia)
         uses: ./.github/actions/build-push-sign
@@ -55,6 +83,7 @@ jobs:
           registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
           tags: "julia-${{ github.ref_name }}"
           target: "julia"
+          upstream_image: ${{ env.UPSTREAM_IMAGE }}
 
       - name: Report to monitoring (success)
         shell: bash
