@@ -37,7 +37,7 @@ jobs:
           key: upstream-digest-${{ steps.upstream_digest.outputs.digest }}
 
       - name: "Precheck: Skip build on old digest"
-        if: steps.cache.outputs.cache-hit == 'true'
+        if: github.event_name == 'schedule' && steps.cache.outputs.cache-hit == 'true'
         run: |
           echo "No new upstream image (digest ${{ steps.upstream_digest.outputs.digest }}). Exiting."
           exit 0
