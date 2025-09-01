@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-pkgs=()
 # Codec support
 pkgs+=(
   libavcodec-freeworld
@@ -21,15 +20,20 @@ pkgs+=(
   seadrive-gui
 )
 
-# Desktop Enhancements / Tools
-# pkgs+=(
-#   kbackup
-# )
-
 # Intel GPU
 if [ "${VARIANT}" == "julia" ]; then
   pkgs+=(
     intel-media-driver
+  )
+fi
+
+# Full Drive Encryption (luks)
+# see other shell script
+
+# Seafile client (would be available as flatpak as well)
+if [ "${VARIANT}" == "julia" ]; then
+  pkgs+=(
+    seafile-client
   )
 fi
 
