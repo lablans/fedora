@@ -10,6 +10,7 @@ if [ "${VARIANT}" == "julia" ]; then
     clevis-systemd
     clevis-udisks2
   )
-  echo 'add_dracutmodules+=" systemd-pcrphase "' \
-    > /etc/dracut.conf.d/15-systemd-pcrphase.conf
+# The following is not necessary as the vendor-shipped initrd already contains the req'd module.
+#  echo 'add_dracutmodules+=" systemd-pcrphase "' \
+#    > /etc/dracut.conf.d/15-systemd-pcrphase.conf
 fi
