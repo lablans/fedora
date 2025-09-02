@@ -61,6 +61,16 @@ jobs:
 
           echo "should_build=${should_build}" >> "$GITHUB_OUTPUT"
 
+  report-build-start:
+    needs: wait-for-new-upstream-image
+    if: needs.wait-for-new-upstream-image.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report to monitoring (start)
+        shell: bash
+        run: |
+          curl "${{ secrets.MONITORING_PUSH_URL }}/start"
+
   build-and-push:
     needs: wait-for-new-upstream-image
     if: needs.wait-for-new-upstream-image.outputs.should_build == 'true'
@@ -71,62 +81,55 @@ jobs:
     env:
       COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
       COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+    strategy:
+      matrix:
+        target:
+          - opa
+          - julia
     steps:
-      - name: Report to monitoring (start)
-        shell: bash
-        env:
-          URL: ${{ secrets.MONITORING_PUSH_URL }}
-        run: |
-          curl "${URL}/start"
-
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3
-
-      - name: Log in to the GitHub Container registry (non-root)
-        uses: redhat-actions/podman-login@v1
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Log in to the GitHub Container registry (root)
+      - name: Log in to the GitHub Container registry
         shell: bash
         run: |
           sudo podman login ${{ env.REGISTRY }} -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+          docker login ${{ env.REGISTRY }} -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build/Push/Sign (opa)
+      - name: Build/Push/Sign
         uses: ./.github/actions/build-push-sign
         with:
           image_name: ${{ env.IMAGE_NAME }}
           registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
-          target: "opa"
+          target: ${{ matrix.target }}
           upstream_image: ${{ env.UPSTREAM_IMAGE }}
 
-      - name: Build/Push/Sign (julia)
-        uses: ./.github/actions/build-push-sign
-        with:
-          image_name: ${{ env.IMAGE_NAME }}
-          registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
-          target: "julia"
-          upstream_image: ${{ env.UPSTREAM_IMAGE }}
-
+  report-build-finish:
+    needs: [ wait-for-new-upstream-image, build-and-push ]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
       - name: "Mark upstream image digest as built (1/2)"
+        if: needs.build-and-push.result == 'success'
         run: |
           mkdir -p "$RUNNER_TEMP/.digest-cache"
           echo "${{ needs.wait-for-new-upstream-image.outputs.upstream_digest }}" > "$RUNNER_TEMP/.digest-cache/last.txt"
 
       - name: "Mark upstream image digest as built (2/2)"
+        if: needs.build-and-push.result == 'success'
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/.digest-cache
           key: upstream-digest-${{ needs.wait-for-new-upstream-image.outputs.upstream_digest }}
 
-      - name: Report to monitoring (success)
+      - name: Report to monitoring (finish)
         shell: bash
         env:
           URL: ${{ secrets.MONITORING_PUSH_URL }}
         run: |
-          curl "${URL}/0"
+          if [[ "${{ needs.build-and-push.result }}" == "success" ]]; then
+            CODE=0
+          else
+            CODE=1
+          fi
+          curl "${{ secrets.MONITORING_PUSH_URL }}/${CODE}"

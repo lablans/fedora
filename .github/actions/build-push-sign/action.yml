@@ -74,6 +74,9 @@ runs:
 
         sudo podman tag $IMAGE ${{ env.ALL_IMAGE_NAMES_WITH_TAGS }}
 
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3
+
     - name: Push to registry (${{ inputs.target }})
       id: push_image
       shell: bash
@@ -89,7 +92,6 @@ runs:
     - name: Sign image (${{ inputs.target }})
       shell: bash
       env:
-        DIGEST: ${{ steps.push_image.outputs.digest }}
         COSIGN_PRIVATE_KEY: ${{ env.COSIGN_PRIVATE_KEY }}
         COSIGN_PASSWORD: ${{ env.COSIGN_PASSWORD }}
       run: |
