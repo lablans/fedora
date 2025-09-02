@@ -63,7 +63,7 @@ jobs:
 
   report-build-start:
     needs: wait-for-new-upstream-image
-    if: needs.wait-for-new-upstream-image.outputs.should_build == 'true'
+    if: needs.wait-for-new-upstream-image.outputs.should_build == 'true' && github.event_name == 'schedule' && github.ref_protected == true
     runs-on: ubuntu-latest
     steps:
       - name: Report to monitoring (start)
@@ -124,6 +124,7 @@ jobs:
 
       - name: Report to monitoring (finish)
         shell: bash
+        if: github.event_name == 'schedule' && github.ref_protected == true
         env:
           URL: ${{ secrets.MONITORING_PUSH_URL }}
         run: |
