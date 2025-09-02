@@ -47,3 +47,22 @@ fi
 echo "2. Installing packages for Variant \"${VARIANT}\": ${pkgs[*]}"
 
 rpm-ostree install "${pkgs[@]}"
+
+echo "3. Removing packages"
+
+pkgs_remove=(
+  nvidia-gpu-firmware
+  akonadi-server-mysql
+  mariadb-server orca
+  mariadb-gssapi-server
+  mariadb-cracklib-password-check
+  mariadb-backup
+)
+
+if [[ "${VARIANT}" == "julia" ]]; then
+  pkgs_remove+=(
+    amd-gpu-firmware
+  )
+fi
+
+rpm-ostree uninstall "${pkgs_remove[@]}"
