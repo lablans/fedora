@@ -18,7 +18,7 @@ jobs:
       should_build: ${{ steps.decide.outputs.should_build }}
       upstream_digest: ${{ steps.upstream_digest.outputs.digest }}
     steps:
-      - name: Check current upstream digest
+      - name: Get current upstream digest
         id: upstream_digest
         shell: bash
         run: |
@@ -29,6 +29,7 @@ jobs:
       - name: Check if that digest was already built
         id: cache
         uses: actions/cache/restore@v4
+        if: github.event_name == 'schedule'
         with:
           # Any small file/dir; we just need a path to bind the cache to.
           path: ${{ runner.temp }}/.digest-cache
