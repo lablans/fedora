@@ -3,24 +3,22 @@ on:
   workflow_dispatch:
   push:
   schedule:
-    - cron: '0 5 * * *'
+    - cron: '30 3 * * *'
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: kinoite
+  UPSTREAM_IMAGE: quay.io/fedora-ostree-desktops/kinoite:42
 
 jobs:
-  build-and-push:
+  wait-for-new-upstream-image:
+    name: Wait for new upstream image
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    env:
-      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-      UPSTREAM_IMAGE: quay.io/fedora-ostree-desktops/kinoite:42
+    outputs:
+      should_build: ${{ steps.decide.outputs.should_build }}
+      upstream_digest: ${{ steps.upstream_digest.outputs.digest }}
     steps:
-      - name: "Precheck: Check upstream digest"
+      - name: Check current upstream digest
         id: upstream_digest
         shell: bash
         run: |
@@ -28,25 +26,51 @@ jobs:
           echo "Newest digest for upstream image ${UPSTREAM_IMAGE}: ${DIGEST}"
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
 
-      - name: "Precheck: Probe if digest was built already"
+      - name: Check if that digest was already built
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           # Any small file/dir; we just need a path to bind the cache to.
           path: ${{ runner.temp }}/.digest-cache
           key: upstream-digest-${{ steps.upstream_digest.outputs.digest }}
 
-      - name: "Precheck: Skip build on old digest"
-        if: github.event_name == 'schedule' && steps.cache.outputs.cache-hit == 'true'
+      - name: Wait for new upstream digest
+        id: decide
         run: |
-          echo "No new upstream image (digest ${{ steps.upstream_digest.outputs.digest }}). Exiting."
-          exit 0
+          should_build=false
 
-      - name: "Precheck: Mark digest as seen"
-        run: |
-          mkdir -p "$RUNNER_TEMP/.digest-cache"
-          echo "${{ steps.upstream_digest.outputs.digest }}" > "$RUNNER_TEMP/.digest-cache/last.txt"
+          if [[ "${{ github.event_name }}" != "schedule" || "${{ steps.cache.outputs.cache-hit }}" == "false" ]]; then
+            should_build=true
+          else
+            deadline=$(( $(date +%s) + 4*3600 ))      # now + 4 hours
+            check_interval=600                        # 10 min between checks
+            OLD_DIGEST="${{ steps.upstream_digest.outputs.digest}}"
 
+            echo "Will wait until $(date -d "@$deadline") for upstream image digest to change ..."
+
+            while [[ "$should_build" == "false" && "$(date +%s)" -le "$deadline" ]]; do
+              echo "Waiting $check_interval seconds before re-checking upstream image digest ..."
+              sleep $check_interval
+              NEW_DIGEST=$(skopeo inspect --format '{{.Digest}}' docker://${UPSTREAM_IMAGE})
+              if [[ "$NEW_DIGEST" != "$OLD_DIGEST" ]]; then
+                should_build=true
+              fi
+            done
+          fi
+
+          echo "should_build=${should_build}" >> "$GITHUB_OUTPUT"
+
+  build-and-push:
+    needs: wait-for-new-upstream-image
+    if: needs.wait-for-new-upstream-image.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+    steps:
       - name: Report to monitoring (start)
         shell: bash
         env:
@@ -84,6 +108,17 @@ jobs:
           tags: "julia-${{ github.ref_name }}"
           target: "julia"
           upstream_image: ${{ env.UPSTREAM_IMAGE }}
+
+      - name: "Mark upstream image digest as built (1/2)"
+        run: |
+          mkdir -p "$RUNNER_TEMP/.digest-cache"
+          echo "${{ needs.wait-for-new-upstream-image.outputs.upstream_digest }}" > "$RUNNER_TEMP/.digest-cache/last.txt"
+
+      - name: "Mark upstream image digest as built (2/2)"
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/.digest-cache
+          key: upstream-digest-${{ needs.wait-for-new-upstream-image.outputs.upstream_digest }}
 
       - name: Report to monitoring (success)
         shell: bash
