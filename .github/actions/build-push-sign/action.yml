@@ -65,6 +65,14 @@ runs:
         prev-ref: "${{ inputs.registry_path }}/${{ steps.build_image.outputs.image-with-tag }}"
         version: ${{ env.VERSION }}
 
+    - name: Save rechunker output
+      uses: actions/upload-artifact@v4
+      with:
+        name: rechunked-image-manifest-${{ inputs.target }}
+        path: |
+          ${{ steps.rechunk.outputs.changelog }}
+          ${{ steps.rechunk.outputs.manifest }}
+
     - name: Load in podman and tag
       shell: bash
       run: |
