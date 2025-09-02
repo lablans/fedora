@@ -32,7 +32,7 @@ runs:
         set -x
         version=$(sudo podman image inspect ${{ inputs.upstream_image }} \
           --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')
-        LONG_TAG="${{ inputs.target }}-${version}"
+        LONG_TAG="${{ inputs.target }}-${{ github.ref_name }}-${version}"
         SHORT_TAG="$(echo ${LONG_TAG} | sed 's:\..*::')"
         BRANCH_TAG="${{ inputs.target }}-${{ github.ref_name }}"
         ALL_TAGS="${{ inputs.target }}-${{ github.sha }} $BRANCH_TAG $LONG_TAG $SHORT_TAG"
