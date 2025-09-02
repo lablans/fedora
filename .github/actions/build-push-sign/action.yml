@@ -36,11 +36,12 @@ runs:
         SHORT_TAG="$(echo ${LONG_TAG} | sed 's:\..*::')"
         BRANCH_TAG="${{ inputs.target }}-${{ github.ref_name }}"
         ALL_TAGS="${{ inputs.target }}-${{ github.sha }} $BRANCH_TAG $LONG_TAG $SHORT_TAG"
+        echo "VERSION=$version" >> $GITHUB_ENV
         echo "LONG_TAG=$LONG_TAG" >> $GITHUB_ENV
         echo "SHORT_TAG=$SHORT_TAG" >> $GITHUB_ENV
         echo "BRANCH_TAG=$BRANCH_TAG" >> $GITHUB_ENV
         echo "ALL_TAGS=$ALL_TAGS" >> $GITHUB_ENV
-        echo "ALL_IMAGE_NAMES_WITH_TAGS=$(echo $ALL_TAGS | sed -e 's;\S\+;${{ inputs.registry_path }}:&;g')" >> $GITHUB_ENV
+        echo "ALL_IMAGE_NAMES_WITH_TAGS=$(echo $ALL_TAGS | sed -e 's;\S\+;${{ inputs.registry_path }}/${{ inputs.image_name }}:&;g')" >> $GITHUB_ENV
         cat $GITHUB_ENV
 
     - name: Build image
@@ -62,6 +63,7 @@ runs:
       with:
         ref: "localhost/${{ steps.build_image.outputs.image-with-tag }}"
         prev-ref: "${{ inputs.registry_path }}/${{ steps.build_image.outputs.image-with-tag }}"
+        version: ${{ env.VERSION }}
 
     - name: Load in podman and tag
       shell: bash
