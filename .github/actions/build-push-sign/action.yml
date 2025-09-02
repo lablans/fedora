@@ -32,10 +32,21 @@ runs:
         extra-args: |
           --target ${{ inputs.target }}
 
-    - name: Add extra Tags
+    - name: Run Rechunker
+      id: rechunk
+      uses: hhd-dev/rechunk@f153348d8100c1f504dec435460a0d7baf11a9d2 # v1.1.1
+      with:
+        rechunk: 'ghcr.io/hhd-dev/rechunk:v1.0.1'
+        ref: "${{ steps.build_image.outputs.image-with-tag }}"
+        prev-ref: "${{ inputs.registry_path }}/${{ inputs.image_name }}:${{ inputs.target }}-${{ github.ref_name }}"
+
+    - name: Load in podman and tag
       shell: bash
       run: |
         set -x
+        IMAGE=$(podman pull ${{ steps.rechunk.outputs.ref }})
+        sudo rm -rf ${{ steps.rechunk.outputs.output }}
+
         version=$(podman image inspect ${{ steps.build_image.outputs.image-with-tag }} \
           --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')
         LONG_TAG="${{ inputs.target }}-${version}"
@@ -43,15 +54,11 @@ runs:
         echo "LONG_TAG=$LONG_TAG" >> $GITHUB_ENV
         echo "SHORT_TAG=$SHORT_TAG" >> $GITHUB_ENV
 
-        podman tag ${{ steps.build_image.outputs.image-with-tag }} \
-          ${{ inputs.image_name }}:${LONG_TAG} \
-          ${{ inputs.image_name }}:${SHORT_TAG}
-
     - name: Push to registry (${{ inputs.target }})
       id: push_image
       uses: redhat-actions/push-to-registry@v2
       with:
-        image: ${{ steps.build_image.outputs.image }}
+        image: ${{ steps.rechunk.outputs.ref }}
         tags: |
           ${{ steps.build_image.outputs.tags }}
           ${{ env.LONG_TAG }}
