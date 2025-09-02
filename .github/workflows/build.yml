@@ -85,19 +85,23 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
 
+      # - name: Log in to the GitHub Container registry
+      #   uses: redhat-actions/podman-login@v1
+      #   with:
+      #     registry: ${{ env.REGISTRY }}
+      #     username: ${{ github.actor }}
+      #     password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Log in to the GitHub Container registry
-        uses: redhat-actions/podman-login@v1
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          sudo podman login ${{ env.REGISTRY }} -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build/Push/Sign (opa)
         uses: ./.github/actions/build-push-sign
         with:
           image_name: ${{ env.IMAGE_NAME }}
           registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
-          tags: "opa-${{ github.ref_name }}"
           target: "opa"
           upstream_image: ${{ env.UPSTREAM_IMAGE }}
 
@@ -106,7 +110,6 @@ jobs:
         with:
           image_name: ${{ env.IMAGE_NAME }}
           registry_path: ${{ env.REGISTRY }}/${{ github.actor }}
-          tags: "julia-${{ github.ref_name }}"
           target: "julia"
           upstream_image: ${{ env.UPSTREAM_IMAGE }}
 

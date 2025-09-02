@@ -7,9 +7,9 @@ inputs:
   registry_path:
     description: Full registry path (e.g. ghcr.io/OWNER)
     required: true
-  tags:
-    description: Space-separated tags (without SHA)
-    required: true
+  # tags:
+  #   description: Space-separated tags (without SHA)
+  #   required: true
   target:
     description: Build target
     required: true
@@ -19,51 +19,70 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Build image (${{ inputs.target }})
+    - name: Pull base image
+      id: pull_base
+      shell: bash
+      run: |
+        sudo podman pull ${{ inputs.upstream_image }}
+
+    - name: Define tags
+      id: set_tags
+      shell: bash
+      run: |
+        set -x
+        version=$(sudo podman image inspect ${{ inputs.upstream_image }} \
+          --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')
+        LONG_TAG="${{ inputs.target }}-${version}"
+        SHORT_TAG="$(echo ${LONG_TAG} | sed 's:\..*::')"
+        BRANCH_TAG="${{ inputs.target }}-${{ github.ref_name }}"
+        ALL_TAGS="${{ inputs.target }}-${{ github.sha }} $BRANCH_TAG $LONG_TAG $SHORT_TAG"
+        echo "LONG_TAG=$LONG_TAG" >> $GITHUB_ENV
+        echo "SHORT_TAG=$SHORT_TAG" >> $GITHUB_ENV
+        echo "BRANCH_TAG=$BRANCH_TAG" >> $GITHUB_ENV
+        echo "ALL_TAGS=$ALL_TAGS" >> $GITHUB_ENV
+        echo "ALL_IMAGE_NAMES_WITH_TAGS=$(echo $ALL_TAGS | sed -e 's;\S\+;${{ inputs.registry_path }}:&;g')" >> $GITHUB_ENV
+        cat $GITHUB_ENV
+
+    - name: Build image
       id: build_image
-      uses: redhat-actions/buildah-build@v2
-      with:
-        image: ${{ inputs.image_name }}
-        containerfiles: |
-          ./Containerfile
-        tags: ${{ inputs.tags }} ${{ inputs.target }}-${{ github.sha }}
-        build-args: |
-          UPSTREAM_IMAGE=${{ inputs.upstream_image }}
-        extra-args: |
+      shell: bash
+      run: |
+        sudo \
+          buildah bud \
+          --file Containerfile \
+          --format docker \
+          --tag ${{ inputs.image_name }}:$BRANCH_TAG \
+          --build-arg UPSTREAM_IMAGE=${{ inputs.upstream_image }} \
           --target ${{ inputs.target }}
+        echo "image-with-tag=${{ inputs.image_name }}:$BRANCH_TAG" >> "$GITHUB_OUTPUT"
 
     - name: Run Rechunker
       id: rechunk
-      uses: hhd-dev/rechunk@f153348d8100c1f504dec435460a0d7baf11a9d2 # v1.1.1
+      uses: hhd-dev/rechunk@master
       with:
-        rechunk: 'ghcr.io/hhd-dev/rechunk:v1.0.1'
-        ref: "${{ steps.build_image.outputs.image-with-tag }}"
-        prev-ref: "${{ inputs.registry_path }}/${{ inputs.image_name }}:${{ inputs.target }}-${{ github.ref_name }}"
+        ref: "localhost/${{ steps.build_image.outputs.image-with-tag }}"
+        prev-ref: "${{ inputs.registry_path }}/${{ steps.build_image.outputs.image-with-tag }}"
 
     - name: Load in podman and tag
       shell: bash
       run: |
         set -x
-        IMAGE=$(podman pull ${{ steps.rechunk.outputs.ref }})
-        sudo rm -rf ${{ steps.rechunk.outputs.output }}
+        IMAGE=$(sudo podman pull ${{ steps.rechunk.outputs.ref }})
+        sudo rm -rf ${{ steps.rechunk.outputs.location }}
 
-        version=$(podman image inspect ${{ steps.build_image.outputs.image-with-tag }} \
-          --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')
-        LONG_TAG="${{ inputs.target }}-${version}"
-        SHORT_TAG=$(echo ${LONG_TAG} | sed 's:\..*::')
-        echo "LONG_TAG=$LONG_TAG" >> $GITHUB_ENV
-        echo "SHORT_TAG=$SHORT_TAG" >> $GITHUB_ENV
+        sudo podman tag $IMAGE ${{ env.ALL_IMAGE_NAMES_WITH_TAGS }}
 
     - name: Push to registry (${{ inputs.target }})
       id: push_image
-      uses: redhat-actions/push-to-registry@v2
-      with:
-        image: ${{ steps.rechunk.outputs.ref }}
-        tags: |
-          ${{ steps.build_image.outputs.tags }}
-          ${{ env.LONG_TAG }}
-          ${{ env.SHORT_TAG }}
-        registry: ${{ inputs.registry_path }}
+      shell: bash
+      run: |
+        set -x
+
+        for IMG in ${{ env.ALL_IMAGE_NAMES_WITH_TAGS }}; do
+          sudo podman push --digestfile=/tmp/mydigest $IMG
+        done
+        echo "digest=$(sudo cat /tmp/mydigest)" >> "$GITHUB_OUTPUT"
+        sudo rm /tmp/mydigest
 
     - name: Sign image (${{ inputs.target }})
       shell: bash
@@ -72,5 +91,13 @@ runs:
         COSIGN_PRIVATE_KEY: ${{ env.COSIGN_PRIVATE_KEY }}
         COSIGN_PASSWORD: ${{ env.COSIGN_PASSWORD }}
       run: |
+        set -x
         cosign sign -y --key env://COSIGN_PRIVATE_KEY \
-          ${{ inputs.registry_path }}/${{ inputs.image_name }}@${DIGEST}
+          ${{ inputs.registry_path }}/${{ inputs.image_name }}@${{ steps.push_image.outputs.digest }}
+
+    - name: Give overview about space consumption
+      shell: bash
+      run: |
+        sudo find
+        sudo podman images -a
+        sudo du -sh *

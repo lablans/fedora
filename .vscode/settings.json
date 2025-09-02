@@ -1,0 +1,5 @@
+{
+    "yaml.schemas": {
+        "https://www.schemastore.org/github-action.json": "file:///home/martin/git/fedora/.github/actions/build-push-sign/action.yml"
+    }
+}
