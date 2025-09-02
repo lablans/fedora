@@ -85,13 +85,6 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
 
-      # - name: Log in to the GitHub Container registry
-      #   uses: redhat-actions/podman-login@v1
-      #   with:
-      #     registry: ${{ env.REGISTRY }}
-      #     username: ${{ github.actor }}
-      #     password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Log in to the GitHub Container registry
         shell: bash
         run: |

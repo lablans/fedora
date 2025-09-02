@@ -94,7 +94,7 @@ runs:
         COSIGN_PASSWORD: ${{ env.COSIGN_PASSWORD }}
       run: |
         set -x
-        cosign sign -y --key env://COSIGN_PRIVATE_KEY \
+        sudo cosign sign -y --key env://COSIGN_PRIVATE_KEY \
           ${{ inputs.registry_path }}/${{ inputs.image_name }}@${{ steps.push_image.outputs.digest }}
 
     - name: Give overview about space consumption
