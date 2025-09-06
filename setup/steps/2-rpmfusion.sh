@@ -5,7 +5,7 @@ set -euo pipefail
 echo "1. Installing RPM Fusion repositories..."
 
 TRY=0
-MAX_TRIES=10
+MAX_TRIES=100
 
 while [[ $TRY -le $MAX_TRIES ]]; do
   ((TRY+=1))
