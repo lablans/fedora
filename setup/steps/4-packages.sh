@@ -20,6 +20,12 @@ pkgs+=(
   seadrive-gui
 )
 
+# Handy tools
+pkgs+=(
+  rbw
+  podman-compose
+)
+
 # Intel GPU
 if [ "${VARIANT}" == "julia" ]; then
   pkgs+=(
