@@ -40,7 +40,8 @@ jobs:
         run: |
           should_build=false
 
-          if [[ "${{ github.event_name }}" != "schedule" || "${{ steps.cache.outputs.cache-hit }}" == "false" ]]; then
+          # Cache miss is an empty string
+          if [[ "${{ github.event_name }}" != "schedule" || "${{ steps.cache.outputs.cache-hit }}" == "" ]]; then
             should_build=true
           else
             deadline=$(( $(date +%s) + 4*3600 ))      # now + 4 hours
